@@ -12,7 +12,31 @@ import xml.etree.ElementTree as ET
 #endregion
 
 class HistoricBambooUpdater():
-    '''Explain Class'''
+    """
+    The HistoricBambooUpdater class provides utilities for interfacing between BambooHR's API
+    and Smartsheet's API to fetch, transform, and update employee historical data.
+
+    This class specifically fetches detailed employment status, hiring, and termination data
+    for each employee and then formats this data suitably for posting to a Smartsheet grid.
+
+    Methods:
+        - pull_report_682: Fetches a specific BambooHR report with detailed employee data.
+        - extract_employee_id_list: Extracts a list of employee IDs and their names.
+        - pullnclean_employement_status_table: Fetches and transforms employment status data from BambooHR.
+        - query_empl_directory: Queries the employee directory using an ID and returns specific field value.
+        - api_original_hire_date: Fetches the "Original Hire Date" for a given employee ID.
+        - api_sage_id: Fetches the Sage ID for a given employee ID.
+        - get_original_hire_date: Computes the correct original hire date from possibly inconsistent data.
+        - get_date: Determines the date of a specific employment event based on its occurrence.
+        - arrange_posting_data: Structures the data in preparation for posting to Smartsheet.
+        - run: Executes the primary sequence of tasks: fetching, transforming, and posting data.
+
+    Usage:
+        To use this class, instantiate it with a config dictionary, and then call the `run` method.
+
+    Requirements:
+        you will need logger.py and smartsheet_grid.py in the same folder as this file for it to run correctly
+    """
     def __init__(self, config):
         self.config = config
         self.smartsheet_token=config.get('smartsheet_token')
@@ -177,6 +201,7 @@ class HistoricBambooUpdater():
         self.posting_data = self.arrange_posting_data()
         self.log.log('Posting Data...')
         self.histdata_grid.post_new_rows(self.posting_data, post_fresh=True)
+        self.histdata_grid.handle_update_stamps()
         self.log.log('~Fin~')
 
 
