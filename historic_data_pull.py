@@ -49,9 +49,9 @@ class HistoricBambooUpdater():
         self.log=ghetto_logger("historic_data_pull.py")
         self.histdata_grid=grid(config.get('ss_sheet_id'))
 #region grab-data
-    def pull_report_682(self):
+    def pull_report_649(self):
         '''report 682 has all the parameters designed for this system (LMS:IT *DON'T DELETE/CHANGE*)'''
-        url = "https://api.bamboohr.com/api/gateway.php/dowbuilt/v1/reports/682?format=JSON&onlyCurrent=true"
+        url = "https://api.bamboohr.com/api/gateway.php/dowbuilt/v1/reports/649?format=JSON&onlyCurrent=true"
         headers = {"authorization": f"Basic {self.bamb_token}"}
         response = requests.get(url, headers=headers)
         hris_data=json.loads(response.text).get('employees')
@@ -59,7 +59,7 @@ class HistoricBambooUpdater():
     def extract_employee_id_list(self):
         '''the employement status is id and then statuses, this employee id list allows us to map each id to the empl name'''
         self.log.log('Pulling BambooHr Data...')
-        self.empl_directory = self.pull_report_682()
+        self.empl_directory = self.pull_report_649()
         employee_id_list = [{'name': F"{employee.get('firstName')} {employee.get('lastName')}", 'id':employee.get('id')} for employee in self.empl_directory]
         return employee_id_list 
     def pullnclean_employement_status_table(self):
@@ -186,6 +186,8 @@ class HistoricBambooUpdater():
                 'Retermination': self.get_date(empl, 2, "Terminated"),
                 'Final Hire': self.get_date(empl, 2, "Hire"),
                 'Sage Id': self.api_sage_id(empl.get('id')),
+                'Location': self.query_empl_directory(empl.get('id'), 'location'),
+                'Job Title': self.query_empl_directory(empl.get('id'), 'jobTitle'),
                 'Department': self.query_empl_directory(empl.get('id'), 'department'),
                 'Work Email': self.query_empl_directory(empl.get('id'), 'workEmail'),
             }
