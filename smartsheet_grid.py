@@ -191,7 +191,10 @@ class grid:
         
         posting_sheet_id = self.grid_id
         column_title_list = list(posting_data[0].keys())
-        self.prep_post(column_title_list)
+        try:
+            self.prep_post(column_title_list)
+        except IndexError:
+            raise ValueError("Index Error reveals that your posting_data dictionary has key(s) that don't match the column names on the Smartsheet")
         if post_fresh:
             self.delete_all_rows()
         
@@ -250,8 +253,8 @@ class grid:
         [ONLY TESTED FOR DATE FIELDS FOR NOW]'''
 
         sum = smartsheet.models.SummaryField({
-            "id": sum_id,
-            "ObjectValue":post
+            "id": int(sum_id),
+            "ObjectValue": post
         })
         resp = self.smart.Sheets.update_sheet_summary_fields(
             self.grid_id,    # sheet_id
