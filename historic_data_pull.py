@@ -175,9 +175,10 @@ class HistoricBambooUpdater():
         return ""
     def arrange_posting_data(self):
         # Constructing posting_data list 20 mins w/ department
-        self.log.log('Arranging Posting Data (expect 8-9 min wait)')
-        posting_data = [
-            {
+        self.log.log(f'Arranging {len(self.empl_stat_data)} Posting records (this will take time)')
+        posting_data = []
+        for i, empl in enumerate(self.empl_stat_data):
+            posting_data.append({
                 'Name': f"{self.query_empl_directory(empl.get('id'), 'firstName')} {self.query_empl_directory(empl.get('id'), 'lastName')}",
                 'Id': empl.get('id'),
                 'Original Hire': self.get_date(empl, 0, "Original Hire"),
@@ -190,9 +191,9 @@ class HistoricBambooUpdater():
                 'Job Title': self.query_empl_directory(empl.get('id'), 'jobTitle'),
                 'Department': self.query_empl_directory(empl.get('id'), 'department'),
                 'Work Email': self.query_empl_directory(empl.get('id'), 'workEmail'),
-            }
-            for empl in self.empl_stat_data
-        ]
+            })
+            if int(i) % 100 == 0 and i != 0:
+                self.log.log(f"   Records {i-100}-{i} Arranged.")
         return posting_data
 #endregion
 
