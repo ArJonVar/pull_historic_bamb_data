@@ -39,7 +39,7 @@ class grid:
     reduce_columns(exclusion_string: str) -> None:
         Removes columns from the 'column_df' attribute based on characters/symbols provided in the exclusion_string.
 
-    prep_post(filtered_column_title_list: Union[str, List[str]]="all_columns") -> None:
+    grab_posting_column_ids(filtered_column_title_list: Union[str, List[str]]="all_columns") -> None:
         Prepares a dictionary for column IDs based on their titles. Used internally for posting new rows.
 
     delete_all_rows() -> None:
@@ -48,6 +48,13 @@ class grid:
     post_new_rows(posting_data: List[Dict[str, Any]], post_fresh: bool=False, post_to_top: bool=False) -> None:
         Posts new rows to the Smartsheet. Can optionally delete the whole sheet before posting or set the position of the new rows.
 
+    update_rows(posting_data: List[Dict[str, Any]], primary_key: str):
+        Updates rows that can be updated, posts rows that do not map to the sheet.
+
+    grab_posting_row_ids(posting_data: List[Dict[str, Any]], primary_key: str):
+        returns a new posting_data called update_data that is a dictionary whose key is the row id, and whose value is the dictionary for the row <column name>:<field value>
+
+    
     Dependencies:
     -------------
     - smartsheet (from smartsheet-python-sdk)
@@ -113,6 +120,7 @@ class grid:
                 self.grid_row_ids = [i.get("id") for i in (self.grid_content).get("rows")]
             self.grid_column_ids = [i.get("id") for i in (self.grid_content).get("columns")]
             self.df = pd.DataFrame(self.grid_rows, columns=self.grid_columns)
+            # Should be row_id intead of id as that is less likely to be taken name space!!!
             self.df["id"]=self.grid_row_ids
             self.column_df = self.get_column_df()
     def fetch_summary_content(self):
@@ -153,7 +161,7 @@ class grid:
 #endregion
 #region ss post
     #region new row(s)
-    def prep_post(self, filtered_column_title_list="all_columns"):
+    def grab_posting_column_ids(self, filtered_column_title_list="all_columns"):
         '''preps for ss post 
         creating a dictionary per column:
         { <title of column> : <column id> }
@@ -192,7 +200,7 @@ class grid:
         posting_sheet_id = self.grid_id
         column_title_list = list(posting_data[0].keys())
         try:
-            self.prep_post(column_title_list)
+            self.grab_posting_column_ids(column_title_list)
         except IndexError:
             raise ValueError("Index Error reveals that your posting_data dictionary has key(s) that don't match the column names on the Smartsheet")
         if post_fresh:
@@ -261,5 +269,109 @@ class grid:
             [sum],
             False    # rename_if_conflict
         )
+    #endregion
+    #region post row update
+    def grab_posting_row_ids(self, posting_data, primary_key, skip_nonmatch=False):
+        '''Prepares for an update by reorganizing the posting data with the row_id as the key and the value as the data.    
+
+        Parameters:
+        - posting_data: Dictionary where each key is a column name and each value is the corresponding row value for that column.
+        - primary_key: A key from `posting_data` that serves as the reference to map row IDs to the posting data (must be case-sensitive match).
+        - skip_nonmatch (optional, default=True): Determines the handling of non-matching primary keys. When set to `True`, rows with non-matching primary keys are ignored. When `False`, these rows are collected into a "new_rows" key in the resulting dictionary.  
+
+        Process:
+        1. Identify the value associated with the `primary_key` in `posting_data`.
+        2. Search for this value in the Smartsheet to find its row_id.
+        3. Return a dictionary: keys are row_ids (or "new_rows" for unmatched rows), values are the corresponding `posting_data` for each row.
+        '''
+
+        self.fetch_content()
+
+        if not self.df.empty:
+            # Mapping of the primary key values to their corresponding row IDs from the current Smartsheet data
+            primary_to_row_id = dict(zip(self.df[primary_key], self.df['id']))  
+
+            # Dictionary to hold the mapping of row IDs to their posting data
+            update_data = {}
+            new_rows = []   
+
+            for data in posting_data:
+                primary_value = data.get(primary_key)
+                if primary_value in primary_to_row_id:
+                    row_id = primary_to_row_id[primary_value]
+                    update_data[row_id] = data
+                elif not skip_nonmatch:
+                    new_rows.append(data)   
+
+            if new_rows:
+                update_data['new_rows'] = new_rows  
+
+            # Check if there were no matches at all
+            if not update_data:
+                raise ValueError(f"The primary_key '{primary_key}' had no matches in the current Smartsheet data.") 
+
+            return update_data
+        else:
+            raise ValueError("Grid Instance is not appropriate for this task. Try create a new grid instance")
+    def update_rows(self, posting_data, primary_key):
+        '''
+        Updates rows in the Smartsheet based on the provided posting data.  
+
+        Parameters:
+        - posting_data (dict): A mapping where:
+            * Each key (except "new_rows") is a row_id.
+            * Each value is another dictionary representing <Column_Name>:<New Value> pairs for the respective row. 
+
+            Special handling for the "new_rows" key:
+            If "new_rows" is present as a key in `posting_data`, its associated value (a list of dictionaries) is treated as rows to be added to the Smartsheet right below the last existing row.  
+
+        Example:
+        posting_data = {
+            123: {"ColumnName1": "NewValueA", "ColumnName2": "NewValueB"},
+            "new_rows": [{"ColumnName1": "ValueA", "ColumnName2": "ValueB"}, ...]
+        }   
+
+        Returns:
+        None. Updates and possibly adds rows in the Smartsheet.
+        '''
+        posting_sheet_id = self.grid_id
+        column_title_list = list(posting_data[0].keys())
+        try:
+            self.grab_posting_column_ids(column_title_list)
+        except IndexError:
+            raise ValueError("Index Error reveals that your posting_data dictionary has key(s) that don't match the column names on the Smartsheet")
+        self.update_data = self.grab_posting_row_ids(posting_data, primary_key)
+
+        rows = []
+        # Handle existing rows' updates
+        for row_id in self.update_data.keys():
+            if row_id != "new_rows":
+                for column_name in self.column_id_dict.keys():
+                    # Build new cell value
+                    new_cell = smartsheet.models.Cell()
+                    new_cell.column_id = self.column_id_dict[column_name]
+                    # stops error where post doesnt go through because value is "None"
+                    if self.update_data[row_id].get(column_name) != None:
+                        new_cell.value = self.update_data[row_id].get(column_name)
+                    else:
+                        new_cell.value = ""
+                    new_cell.strict = False
+
+                # Build the row to update
+                new_row = smartsheet.models.Row()
+                new_row.id = row_id
+                new_row.cells.append(new_cell)
+                rows.append(new_row)
+
+        # Update rows
+        self.update_response = self.smart.Sheets.update_rows(
+          posting_sheet_id ,      # sheet_id
+          rows)
+
+        try:
+            # Handle addition of new rows if the "new_rows" key is present
+            self.post_new_rows(self.update_data.get('new_rows'))
+        except TypeError:
+            pass
     #endregion
 #endregion

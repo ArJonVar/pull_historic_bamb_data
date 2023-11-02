@@ -47,7 +47,9 @@ class HistoricBambooUpdater():
         self.smart.errors_as_exceptions(True)
         self.start_time = time.time()
         self.log=ghetto_logger("historic_data_pull.py")
-        self.histdata_grid=grid(config.get('ss_sheet_id'))
+        self.histdata_grid=grid(config.get('historicbamboodata_sheetid'))
+        self.annirecog_grid=grid(config.get('anni_recognition_sheetid'))
+        
 #region grab-data
     def pull_report_649(self):
         '''report 682 has all the parameters designed for this system (LMS:IT *DON'T DELETE/CHANGE*)'''
@@ -178,14 +180,17 @@ class HistoricBambooUpdater():
         self.log.log(f'Arranging {len(self.empl_stat_data)} Posting records (this will take time)')
         posting_data = []
         for i, empl in enumerate(self.empl_stat_data):
+            # for testing
+            # if i < 200:
             posting_data.append({
                 'Name': f"{self.query_empl_directory(empl.get('id'), 'firstName')} {self.query_empl_directory(empl.get('id'), 'lastName')}",
                 'Id': empl.get('id'),
-                'Original Hire': self.get_date(empl, 0, "Original Hire"),
-                'Termination': self.get_date(empl, 1, "Terminated"),
-                'Rehire': self.get_date(empl, 1, "Hire"),
-                'Retermination': self.get_date(empl, 2, "Terminated"),
-                'Final Hire': self.get_date(empl, 2, "Hire"),
+                'HRIS Original Hire': self.get_date(empl, 0, "Original Hire"),
+                'HRIS Original Termination': self.get_date(empl, 1, "Terminated"),
+                'HRIS Rehire': self.get_date(empl, 1, "Hire"),
+                'HRIS Retermination': self.get_date(empl, 2, "Terminated"),
+                'HRIS Final Hire': self.get_date(empl, 2, "Hire"),
+                'HRIS Final Termination': self.get_date(empl, 3, "Terminated"),
                 'Sage Id': self.api_sage_id(empl.get('id')),
                 'Location': self.query_empl_directory(empl.get('id'), 'location'),
                 'Job Title': self.query_empl_directory(empl.get('id'), 'jobTitle'),
@@ -203,8 +208,12 @@ class HistoricBambooUpdater():
         self.empl_stat_data = self.pullnclean_employement_status_table()
         self.posting_data = self.arrange_posting_data()
         self.log.log('Posting Data...')
+        # posting for Powerbi re: ticket data
         self.histdata_grid.post_new_rows(self.posting_data, post_fresh=True)
         self.histdata_grid.handle_update_stamps()
+        # posting for Recognition Smartsheet re: bonuses/shouts/swag
+        self.annirecog_grid.update_rows(self.posting_data, "Name")
+        self.annirecog_grid.handle_update_stamps()
         self.log.log('~Fin~')
 
 
@@ -213,7 +222,8 @@ if __name__ == "__main__":
         'smartsheet_token':smartsheet_token,
         'bamb_token_base64_Coby':bamb_token_base64_Coby, 
         'bamb_token_base64': bamb_token_base64,
-        'ss_sheet_id':820659588386692
+        'historicbamboodata_sheetid':820659588386692,
+        'anni_recognition_sheetid':2371507443421060,
     }
     hbu= HistoricBambooUpdater(config)
     hbu.run()
