@@ -315,21 +315,10 @@ class grid:
             raise ValueError("Grid Instance is not appropriate for this task. Try create a new grid instance")
     def update_rows(self, posting_data, primary_key):
         '''
-        Updates rows in the Smartsheet based on the provided posting data.  
+        Updates rows (and adds misc rows) in the Smartsheet based on the provided posting data.  
 
         Parameters:
-        - posting_data (dict): A mapping where:
-            * Each key (except "new_rows") is a row_id.
-            * Each value is another dictionary representing <Column_Name>:<New Value> pairs for the respective row. 
-
-            Special handling for the "new_rows" key:
-            If "new_rows" is present as a key in `posting_data`, its associated value (a list of dictionaries) is treated as rows to be added to the Smartsheet right below the last existing row.  
-
-        Example:
-        posting_data = {
-            123: {"ColumnName1": "NewValueA", "ColumnName2": "NewValueB"},
-            "new_rows": [{"ColumnName1": "ValueA", "ColumnName2": "ValueB"}, ...]
-        }   
+        - posting_data (list of dicts)
 
         Returns:
         None. Updates and possibly adds rows in the Smartsheet.
@@ -346,21 +335,20 @@ class grid:
         # Handle existing rows' updates
         for row_id in self.update_data.keys():
             if row_id != "new_rows":
+                # Build the row to update
+                new_row = smartsheet.models.Row()
+                new_row.id = row_id
                 for column_name in self.column_id_dict.keys():
                     # Build new cell value
                     new_cell = smartsheet.models.Cell()
-                    new_cell.column_id = self.column_id_dict[column_name]
+                    new_cell.column_id = int(self.column_id_dict[column_name])
                     # stops error where post doesnt go through because value is "None"
                     if self.update_data[row_id].get(column_name) != None:
                         new_cell.value = self.update_data[row_id].get(column_name)
                     else:
                         new_cell.value = ""
                     new_cell.strict = False
-
-                # Build the row to update
-                new_row = smartsheet.models.Row()
-                new_row.id = row_id
-                new_row.cells.append(new_cell)
+                    new_row.cells.append(new_cell)
                 rows.append(new_row)
 
         # Update rows
