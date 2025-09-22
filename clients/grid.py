@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# V7.23.2025
+# V9.22.2025
 # TODO: change fetch and fetch summary into dfs that can BOTH exist!
 
 import smartsheet
@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 from requests.exceptions import JSONDecodeError
 from dateutil.parser import parse
+import re
 from configs.crypter import *
 config = json.loads(Path("configs/config.json").read_text())
 
@@ -174,6 +175,11 @@ class grid:
     def is_date_like(self, s):
         """Returns True if string s appears to be a valid date/time."""
         if not isinstance(s, str):
+            return False
+        # Reject strings that are only digits (e.g., "1", "2025")
+        if re.fullmatch(r"\d+", s):
+            return False
+        if not any(c in s for c in "-/:. "):  # no date-like separators
             return False
         try:
             parse(s, fuzzy=False)

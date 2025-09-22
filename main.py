@@ -216,12 +216,12 @@ class HistoricBambooUpdater():
         histdata_grid.post_new_rows(self.posting_data, post_fresh=True)
         histdata_grid.handle_update_stamps()
         # posting for Recognition Smartsheet re: bonuses/shouts/swag
-        annirecog_grid.update_rows(self.posting_data, "Name")
+        annirecog_grid.update_rows(self.posting_data, "Id")
         annirecog_grid.handle_update_stamps()
         logger.info('~Fin~')
 
 
 if __name__ == "__main__":
-    pass
+    # pass
     hbu= HistoricBambooUpdater()
     hbu.run()
